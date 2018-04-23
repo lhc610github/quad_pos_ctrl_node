@@ -129,6 +129,9 @@ include_directories(
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/quad_pos_ctrl.cpp
 # )
+add_library(quad_pos_ctrl
+  src/controller.cpp
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -140,6 +143,7 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/quad_pos_ctrl_node.cpp)
 add_executable(quad_pos_ctrl_node src/quad_pos_ctrl_node.cpp)
+add_executable(test_pub_node src/test_pub_node.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -157,6 +161,11 @@ add_executable(quad_pos_ctrl_node src/quad_pos_ctrl_node.cpp)
 # )
 
 target_link_libraries(quad_pos_ctrl_node
+  quad_pos_ctrl
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(test_pub_node
   ${catkin_LIBRARIES}
 )
 
