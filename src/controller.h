@@ -40,7 +40,7 @@ class Controller : public State_Estimate {
             Eigen::Vector3d pos_d;
             Eigen::Vector3d vel_d;
             Eigen::Vector3d acc_d;
-            uint8_t cmd_mask;
+            uint8_t cmd_mask; /* |1: position ctrl valied |2: velocity ctrl valied |3: acc ctrl valied |..|8: */
             ctrl_cmd() {
                 header = ros::Time::now();
                 pos_d = Eigen::Vector3d::Zero();
@@ -60,6 +60,7 @@ class Controller : public State_Estimate {
 
     private:
         void controller_loop();
+        void one_step();
         //void cal_U1_thrust(const );
         //boost::thread controller_thread;
         pthread_t ctrl_tid;

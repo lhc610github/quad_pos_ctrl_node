@@ -17,6 +17,9 @@ class Intigrate_State{
                 if ((now-past).toSec() > 1.0f/sample_rate_) {
                     intigrate_status = (input*((now-past).toSec())) + intigrate_status;
                     intigrate_valid = true;
+                } 
+                if ((now-past).toSec() > 1.0f) {
+                    reset();
                 }
             } else {
                 intigrate_status = input*((now-past).toSec());
@@ -63,6 +66,9 @@ class Diff_State{
                 if ((now-past).toSec() > 1.0f/sample_rate_) {
                     diff_status = (input-status)/((now-past).toSec());
                     diff_valid = true;
+                }
+                if ((now-past).toSec() > 1.0f) {
+                    reset();
                 }
             }
             status = input;

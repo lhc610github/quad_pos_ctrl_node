@@ -52,7 +52,7 @@ class State_Estimate{
         nh_(nh),
         rigidbody_id_(id),
         Pos_differ_(120.0f),
-        Vel_differ_(120.0f) {
+        Vel_differ_(60.0f) {
             char * base_channel;
             base_channel = new char[sizeof("/mocap_data_rigid")];
             strcpy(base_channel,"/mocap_data_rigid");
