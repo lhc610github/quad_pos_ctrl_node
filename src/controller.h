@@ -24,14 +24,19 @@ class Controller : public State_Estimate {
             pthread_join(ctrl_tid, NULL);
         }
 
-        typedef struct ctrl_res {
+        typedef struct U_res {
             ros::Time header;
             Eigen::Quaterniond q_d;
             double U1;
-            ctrl_res() {
-                header = ros::Time::now();
+
+            void reset() {
                 q_d = Eigen::Quaterniond::Identity();
                 U1 = 0.0f;
+            }
+
+            ctrl_res() {
+                header = ros::Time::now();
+                reset();
             }
         }U_s;
 
@@ -61,6 +66,7 @@ class Controller : public State_Estimate {
     private:
         void controller_loop();
         void one_step();
+        U_s Controller::cal_Rd_thrust(const &PID_ctrl<cmd_s,State_s>::res_s ctrl_res);
         //void cal_U1_thrust(const );
         //boost::thread controller_thread;
         pthread_t ctrl_tid;

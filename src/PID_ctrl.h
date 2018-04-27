@@ -33,10 +33,10 @@ class PID_ctrl {
             Eigen::Vector3d V_p;
             Eigen::Vector3d V_d;
             ctrl_param() {
-                P_i << 0.03f, 0.03f, 0.03f;
-                P_p << 0.1f, 0.1f, 0.1f;
-                V_p << 0.2f, 0.2f, 0.2f;
-                V_d << 0.01f, 0.01f, 0.01f;
+                P_i << 0.0f, 0.0f, 0.0f;
+                P_p << 0.0f, 0.0f, 0.0f;
+                V_p << 0.0f, 0.0f, 0.0f;
+                V_d << 0.0f, 0.0f, 0.0f;
             }
         }param_s;
 
@@ -65,7 +65,10 @@ class PID_ctrl {
             if ( state_ref.cmd_mask & 1 == 1) {
                 state_ref.vel_d = single_state_ctrl_param.P_p.array()*(state_ref.pos_d - state.Pos).array(); 
             }
-            if ( state_ref.cmd_mask & 2 == 2) {
+            if ( state_ref.cmd_mask & 2 == 2 || state_ref.cmd_mask & 1 == 1) {
+                if ( state_ref.cmd_mask & 1 != 1 && (ros::Time::now() - state_ref.header > ros::Duration(1.0f)) ) {
+                    return Eigen::Vector3d::Zero();
+                }
                 Eigen::Vector3d e_V = state_ref.vel_d - state.Vel;
                 P_int.update(single_state_ctrl_param.P_i.array()*e_V.array(),state.header);
                 Eigen::Vector3d ctrl_P_int; 
@@ -84,11 +87,11 @@ class PID_ctrl {
         }
 
         bool run(const K &state, res_s &res) {
+            res.header = state.header;
             if ( state_ref.cmd_mask != 0 ) {
                 if ( state_ref.cmd_mask & 7 == 7) {
                     Eigen::Vector3d e_P = state_ref.pos_d - state.Pos; 
                     Eigen::Vector3d e_V = state_ref.vel_d - state.Vel; 
-                    res.header = state.header;
                     res.res = all_state_ctrl(e_P,e_V,state); 
                 } else {
                     res.res = single_state_ctrl(state);
