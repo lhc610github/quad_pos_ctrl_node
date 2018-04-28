@@ -17,15 +17,16 @@ class Intigrate_State{
                 if ((now-past).toSec() > 1.0f/sample_rate_) {
                     intigrate_status = (input*((now-past).toSec())) + intigrate_status;
                     intigrate_valid = true;
+                    past = now;
                 } 
                 if ((now-past).toSec() > 1.0f) {
                     reset();
                 }
             } else {
-                intigrate_status = input*((now-past).toSec());
+                past = now;
+                init_flag = true;
+                intigrate_status = Eigen::Vector3d::Zero();//input*((now-past).toSec());
             }
-            past = now;
-            init_flag = true;
         }
 
         bool get_int(T &output) {
@@ -66,14 +67,17 @@ class Diff_State{
                 if ((now-past).toSec() > 1.0f/sample_rate_) {
                     diff_status = (input-status)/((now-past).toSec());
                     diff_valid = true;
+                    past = now;
+                    status = input;
                 }
                 if ((now-past).toSec() > 1.0f) {
                     reset();
                 }
+            } else {
+                past = now;
+                status = input;
+                init_flag = true;
             }
-            status = input;
-            past = now;
-            init_flag = true;
         }
 
         bool get_diff(ros::Time &timestamp, T& diff) {
