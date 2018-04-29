@@ -66,19 +66,34 @@ class PID_ctrl {
             sprintf(data, "%lu", ros::Time::now().toNSec());
             logger_file_name += data;
             logger_file_name += ".csv";
-            ctrl_logger.open(logger_file_name.c_str(), std::ios::out);
-            if (!ctrl_logger.is_open()) {
+            logger.open(logger_file_name.c_str(), std::ios::out);
+            if (!logger.is_open()) {
                 std::cout << "cannot open the logger." << std::endl;
             } else {
-                ctrl_logger << "timestamp" << ',';
-                ctrl_logger << "ctrl_output_x(ned)" << ',';
-                ctrl_logger << "ctrl_output_y(ned)" << ',';
-                ctrl_logger << "ctrl_output_z(ned)" << ',';
-                ctrl_logger << "U1" << ',';
-                ctrl_logger << "q_d_w" << ',';
-                ctrl_logger << "q_d_x" << ',';
-                ctrl_logger << "q_d_y" << ',';
-                ctrl_logger << "q_d_z" << std::endl;
+                logger << "timestamp" << ',';
+                logger << "mocap_x(ned)" << ',';
+                logger << "mocap_y(ned)" << ',';
+                logger << "mocap_z(ned)" << ',';
+                logger << "mocap_vx(ned)" << ',';
+                logger << "mocap_vy(ned)" << ',';
+                logger << "mocap_vz(ned)" << ',';
+                logger << "mocap_ax(ned)" << ',';
+                logger << "mocap_ay(ned)" << ',';
+                logger << "mocap_az(ned)" << ',';
+                logger << "mocap_q_w" << ',';
+                logger << "mocap_q_x" << ',';
+                logger << "mocap_q_y" << ',';
+                logger << "mocap_q_z" << ',';
+                logger << "pos_d_x" << ',';
+                logger << "pos_d_y" << ',';
+                logger << "pos_d_z" << ',';
+                logger << "vel_d_x" << ',';
+                logger << "vel_d_y" << ',';
+                logger << "vel_d_z" << ',';
+                logger << "acc_d_x" << ',';
+                logger << "acc_d_y" << ',';
+                logger << "acc_d_z" << ',';
+                logger << "ref_mask" << std::endl;
             }
 #endif
         }
@@ -117,23 +132,34 @@ class PID_ctrl {
             }
         }param_s;
 
+        typedef struct saturate_state_t {
+            bool xy_saturate;
+            bool z_saturate;
+            saturate_state_t() {
+                xy_saturate = false;
+                z_saturate = false;
+            }
+        }sa_res_s;
+
         void reset() {
             P_int.reset();
             V_diff.reset();
             V_diff2.reset();
         }
 
-        void limit_func(Eigen::Vector3d &v, int order) {
-
+        sa_res_s limit_func(Eigen::Vector3d &v, int order) {
+            sa_res_s res;
             if (order == 1) {
                 float temp_xy = v.block<2,1>(0,0).norm();
                 if (temp_xy > ctrl_limit.vel_xy_limit) {
                     v(0) = v(0) / temp_xy * ctrl_limit.vel_xy_limit;
                     v(1) = v(1) / temp_xy * ctrl_limit.vel_xy_limit;
+                    res.xy_saturate = true;
                 }
-                float temp_z = abs(v(2));
+                float temp_z = fabsf(v(2));
                 if (temp_z > ctrl_limit.vel_z_limit) {
                     v(2) = v(2) / temp_z * ctrl_limit.vel_z_limit;
+                    res.z_saturate = true;
                 }
             }
 
@@ -142,12 +168,15 @@ class PID_ctrl {
                 if (temp_xy > ctrl_limit.acc_xy_limit) {
                     v(0) = v(0) / temp_xy * ctrl_limit.acc_xy_limit;
                     v(1) = v(1) / temp_xy * ctrl_limit.acc_xy_limit;
+                    res.xy_saturate = true;
                 }
-                float temp_z = abs(v(2));
+                float temp_z = fabsf(v(2));
                 if (temp_z > ctrl_limit.acc_z_limit) {
                     v(2) = v(2) / temp_z * ctrl_limit.acc_z_limit;
+                    res.z_saturate = true;
                 }
             }
+            return res;
         }
 
         T get_ref() { return state_ref; }
@@ -155,49 +184,130 @@ class PID_ctrl {
         void set_ref(const T &ref) { state_ref = ref; }
 
         Eigen::Vector3d all_state_ctrl(const Eigen::Vector3d &P_e,const Eigen::Vector3d &V_e, const K &state) {
-                P_int.update(all_state_ctrl_param.P_i.array()*P_e.array(),state.header); 
-                Eigen::Vector3d ctrl_P_int; 
-                P_int.get_int(ctrl_P_int); 
 
                 V_diff.update(V_e,state.header); 
                 Eigen::Vector3d ctrl_V_diff; 
                 V_diff.get_diff(ctrl_V_diff);
 
+                Eigen::Vector3d ctrl_P_int; 
+                P_int.get_int(ctrl_P_int); 
+
                 Eigen::Vector3d res;
                 res = ctrl_P_int.array() + all_state_ctrl_param.P_p.array()*P_e.array()
                     + all_state_ctrl_param.V_p.array()*V_e.array()
                     + all_state_ctrl_param.V_d.array()*ctrl_V_diff.array();
-                limit_func(res, 2);
+                sa_res_s sa_state = limit_func(res,2);
+                Eigen::Vector3d int_e;
+                int_e = P_e;
+                if ( sa_state.xy_saturate ) {
+                    int_e(0) = 0.0f;
+                    int_e(1) = 0.0f;
+                }
+                if ( sa_state.z_saturate ) {
+                    int_e(2) = 0.0f;
+                }
+                P_int.update(all_state_ctrl_param.P_i.array()*int_e.array(),state.header); 
                 res = res.array()
                     + g_vector.array();
+#ifdef USE_LOGGER
+                if (logger.is_open()) {
+                    logger << ros::Time::now().toNSec() << ',';
+                    logger << state.Pos(0) << ',';
+                    logger << state.Pos(1) << ',';
+                    logger << state.Pos(2) << ',';
+                    logger << state.Vel(0) << ',';
+                    logger << state.Vel(1) << ',';
+                    logger << state.Vel(2) << ',';
+                    logger << state.Acc(0) << ',';
+                    logger << state.Acc(1) << ',';
+                    logger << state.Acc(2) << ',';
+                    logger << state.att_q.w() << ',';
+                    logger << state.att_q.x() << ',';
+                    logger << state.att_q.y() << ',';
+                    logger << state.att_q.z() << ',';
+                    logger << state_ref.pos_d(0) << ',';
+                    logger << state_ref.pos_d(1) << ',';
+                    logger << state_ref.pos_d(2) << ',';
+                    logger << state_ref.vel_d(0) << ',';
+                    logger << state_ref.vel_d(1) << ',';
+                    logger << state_ref.vel_d(2) << ',';
+                    logger << state_ref.acc_d(0) << ',';
+                    logger << state_ref.acc_d(1) << ',';
+                    logger << state_ref.acc_d(2) << ',';
+                    logger << (int)state_ref.cmd_mask << std::endl;
+                }
+#endif
                 return res;
         }
 
         Eigen::Vector3d single_state_ctrl(const K &state) {
-            if ( state_ref.cmd_mask & P_C_V == P_C_V) {
+            if ( (state_ref.cmd_mask & P_C_V) == P_C_V) {
                 state_ref.vel_d = single_state_ctrl_param.P_p.array()*(state_ref.pos_d - state.Pos).array(); 
                 limit_func(state_ref.vel_d, 1);
             }
-            if ( state_ref.cmd_mask & V_C_V == V_C_V || state_ref.cmd_mask & P_C_V == P_C_V) {
-                if ( state_ref.cmd_mask & P_C_V != P_C_V && (ros::Time::now() - state_ref.header > ros::Duration(1.0f)) ) {
+            if ( ((state_ref.cmd_mask & V_C_V) == V_C_V) 
+            || (state_ref.cmd_mask & (P_C_V == P_C_V)) ) {
+                if ( (state_ref.cmd_mask & (P_C_V != P_C_V)) 
+                && (ros::Time::now() - state_ref.header > ros::Duration(1.0f)) ) {
                     return Eigen::Vector3d::Zero();
                 }
                 Eigen::Vector3d e_V = state_ref.vel_d - state.Vel;
-                P_int.update(single_state_ctrl_param.P_i.array()*e_V.array(),state.header);
-                Eigen::Vector3d ctrl_P_int; 
-                P_int.get_int(ctrl_P_int); 
 
                 V_diff2.update(-state.Vel,state.header); 
                 Eigen::Vector3d ctrl_V_diff; 
                 V_diff2.get_diff(ctrl_V_diff);
 
+                Eigen::Vector3d ctrl_P_int; 
+                P_int.get_int(ctrl_P_int); 
+
                 Eigen::Vector3d res;
                 res = single_state_ctrl_param.V_p.array()*e_V.array()
                     + single_state_ctrl_param.V_d.array()*ctrl_V_diff.array()
                     + ctrl_P_int.array();
-                limit_func(res, 2);
+                std::cout << "before : " << res.transpose() << std::endl;
+                sa_res_s sa_state = limit_func(res,2);
+                std::cout << "after  : " << res.transpose() << std::endl;
+                Eigen::Vector3d int_e;
+                int_e = e_V;
+                if ( sa_state.xy_saturate ) {
+                    int_e(0) = 0.0f;
+                    int_e(1) = 0.0f;
+                }
+                if ( sa_state.z_saturate ) {
+                    int_e(2) = 0.0f;
+                }
+                P_int.update(single_state_ctrl_param.P_i.array()*int_e.array(),state.header);
+                std::cout << int_e.transpose() << std::endl;
                 res = res.array()
                     + g_vector.array();
+#ifdef USE_LOGGER
+                if (logger.is_open()) {
+                    logger << ros::Time::now().toNSec() << ',';
+                    logger << state.Pos(0) << ',';
+                    logger << state.Pos(1) << ',';
+                    logger << state.Pos(2) << ',';
+                    logger << state.Vel(0) << ',';
+                    logger << state.Vel(1) << ',';
+                    logger << state.Vel(2) << ',';
+                    logger << state.Acc(0) << ',';
+                    logger << state.Acc(1) << ',';
+                    logger << state.Acc(2) << ',';
+                    logger << state.att_q.w() << ',';
+                    logger << state.att_q.x() << ',';
+                    logger << state.att_q.y() << ',';
+                    logger << state.att_q.z() << ',';
+                    logger << state_ref.pos_d(0) << ',';
+                    logger << state_ref.pos_d(1) << ',';
+                    logger << state_ref.pos_d(2) << ',';
+                    logger << state_ref.vel_d(0) << ',';
+                    logger << state_ref.vel_d(1) << ',';
+                    logger << state_ref.vel_d(2) << ',';
+                    logger << state_ref.acc_d(0) << ',';
+                    logger << state_ref.acc_d(1) << ',';
+                    logger << state_ref.acc_d(2) << ',';
+                    logger << (int)state_ref.cmd_mask << std::endl;
+                }
+#endif
                 return res;
             }
             return Eigen::Vector3d::Zero();
@@ -206,7 +316,7 @@ class PID_ctrl {
         bool run(const K &state, res_s &res) {
             res.header = state.header;
             if ( state_ref.cmd_mask != 0 ) {
-                if ( state_ref.cmd_mask  == P_C_V|V_C_V|A_C_V ) {
+                if ( state_ref.cmd_mask  == (P_C_V|V_C_V|A_C_V) ) {
                     Eigen::Vector3d e_P = state_ref.pos_d - state.Pos; 
                     Eigen::Vector3d e_V = state_ref.vel_d - state.Vel; 
                     res.res = all_state_ctrl(e_P,e_V,state); 
@@ -228,8 +338,7 @@ class PID_ctrl {
         Eigen::Vector3d g_vector;
         limit_s ctrl_limit;
 #ifdef USE_LOGGER
-        //Logger ctrl_logger;
-        std::ofstream ctrl_logger;
+        std::ofstream logger;
 #endif
 }; 
 

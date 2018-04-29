@@ -6,7 +6,7 @@ void Controller::controller_loop() {
     ros::Rate ctrl_rate(100);
     ROS_INFO("controller run at 100Hz");
     status_ref.header = ros::Time::now();
-    status_ref.pos_d << 1.0f, 0.0f, -0.5f;
+    status_ref.pos_d << 10.0f, 0.0f, -0.5f;
     status_ref.cmd_mask = P_C_V;
     bool armed = true;
     while (ros::ok()) {
@@ -27,7 +27,7 @@ void Controller::one_step() {
         ctrl_core.set_ref(status_ref);
         PID_ctrl<cmd_s,State_s>::res_s ctrl_res;
         ctrl_core.run(get_state(), ctrl_res);
-        std::cout << ctrl_res.res.transpose() << std::endl;
+        //std::cout << ctrl_res.res.transpose() << std::endl;
         U_s U = cal_Rd_thrust(ctrl_res);
 #ifdef USE_LOGGER
         if (ctrl_logger.is_open()) {
@@ -69,7 +69,7 @@ Controller::U_s Controller::cal_Rd_thrust(const PID_ctrl<cmd_s,State_s>::res_s &
 
         /* get body_x */
         Eigen::Vector3d _body_x;
-        if ( abs(_body_z(2)) > 0.0001f ) {
+        if ( fabsf(_body_z(2)) > 0.0001f ) {
             _body_x = _y_C.cross(_body_z);
             if (_body_z(2) < 0) {
                 _body_x = - _body_x;

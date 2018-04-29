@@ -43,9 +43,9 @@ class State_Estimate{
             state_.att_q.z() = rigid_.pose.orientation.z;
             state_.header = rigid_.header.stamp;
 
-            std::cout << "POS: " << state_.Pos.transpose() << std::endl; 
-            std::cout << "VEL: " << state_.Vel.transpose() << std::endl; 
-            std::cout << "ACC: " << state_.Acc.transpose() << std::endl; 
+            //std::cout << "POS: " << state_.Pos.transpose() << std::endl; 
+            //std::cout << "VEL: " << state_.Vel.transpose() << std::endl; 
+            //std::cout << "ACC: " << state_.Acc.transpose() << std::endl; 
             
         }
         
